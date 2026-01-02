@@ -1,32 +1,28 @@
+import os
 import sqlite3
 from flask import g
-from app.config import Config
 
-def get_db() -> sqlite3.Connection:
-    if "db" not in g:
-        g.db = sqlite3.connect(
-        Config.DATABASE,
-        detect_types=sqlite3.PARSE_DECLTYPES,)
+# Шлях до файлу бази даних відносно цього модуля
+BASE_DIR = os.path.dirname(__file__)
+DATABASE = os.path.join(BASE_DIR, "users.db")
 
-    g.db.row_factory = sqlite3.Row
-    return g.db
+def get_db():
+    """
+    Повертає з'єднання з базою даних.
+    Зберігає з'єднання в g для використання протягом одного запиту.
+    """
+    db = getattr(g, "_database", None)
+    if db is None:
+        db = g._database = sqlite3.connect(DATABASE)
+        db.row_factory = sqlite3.Row  # дозволяє використовувати dict(row)
+    return db
 
-def close_db(e=None):
-    db = g.pop("db", None)
+
+def close_db(exception=None):
+    """
+    Закриває з'єднання з базою даних, якщо воно існує.
+    Викликається автоматично Flask після завершення запиту.
+    """
+    db = getattr(g, "_database", None)
     if db is not None:
         db.close()
-
-def init_db() -> None:
-    db = get_db()
-    db.executescript(
-"""
-CREATE TABLE IF NOT EXISTS users (
-id INTEGER PRIMARY KEY AUTOINCREMENT,
-username TEXT UNIQUE NOT NULL,
-password TEXT NOT NULL,
-salt TEXT NOT NULL
-);
-"""
-)
-    db.commit()
-    db.close()
